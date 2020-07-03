@@ -1,0 +1,21 @@
+[package]
+name = "ical-filter"
+version = "0.1.0"
+authors = ["Wouter Geraedts <git@woutergeraedts.nl>"]
+edition = "2018"
+
+[dependencies]
+actix-web = { version = "2.0.0", features = ["rustls"] }
+actix-rt = "1.1.1"
+awc = "1.0.1"
+bytes = "0.5.5"
+env_logger = "0.7.1"
+log = "0.4.8"
+
+# To generate ICS
+ics = "0.4.2"
+# To parse ICS
+ical = "0.6.0"
+
+serde = "1.0.114"
+serde_json = "1.0.55"
