@@ -1,5 +1,5 @@
 # ical-filter
-HTTP daemon that can parse any ical feed and represent it in a normalized fashion. Allows filtering of summaries.
+HTTP daemon that can parse any ical feed and represent it in a normalized fashion. Allows filtering based on iCalendar event summaries. Ideal if you have a iCalendar feed that you want tailor made to include in your favorite calendar application. I use it to create a personalized duty-call calendar, since I do not have access to the software that serves the original feed.
 
 **Note**: currently any other alarms, todos, journals and freebusies are not propagated. If you need this please file an issue.
 
@@ -33,7 +33,7 @@ Will retrieve similar to:
 [
     {
         "uid": "TU586226199",
-        "summary": "reservation",
+        "summary": "Duty call",
         "stamp": "2020-07-03T08:55:14Z",
         "created": "2020-01-20T16:17:34Z",
         "start": "2020-01-25T08:00:00Z",
@@ -41,7 +41,7 @@ Will retrieve similar to:
     },
     {
         "uid": "TU597147530",
-        "summary": "reservation",
+        "summary": "Duty call",
         "stamp": "2020-07-03T08:55:14Z",
         "created": "2020-01-28T07:45:28Z",
         "start": "2020-02-02T08:00:00Z",
@@ -75,7 +75,7 @@ END:VTIMEZONE
 BEGIN:VEVENT
 UID:TU586226199
 DTSTAMP:20200703T085514Z
-SUMMARY:Wouter
+SUMMARY:Duty call
 DTSTART:20200125T080000Z
 DTEND:20200125T080000Z
 CREATED:20200120T161734Z
@@ -83,7 +83,7 @@ END:VEVENT
 BEGIN:VEVENT
 UID:TU597147530
 DTSTAMP:20200703T085514Z
-SUMMARY:Wouter
+SUMMARY:Duty call
 DTSTART:20200202T080000Z
 DTEND:20200202T080000Z
 CREATED:20200128T074528Z
