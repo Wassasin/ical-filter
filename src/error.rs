@@ -27,6 +27,12 @@ impl core::convert::From<ical::parser::ParserError> for Error {
     }
 }
 
+impl core::convert::From<chrono::format::ParseError> for Error {
+    fn from(_: chrono::format::ParseError) -> Self {
+        Error::Inconsistency
+    }
+}
+
 pub type Result<T> = core::result::Result<T, Error>;
 
 impl core::fmt::Display for Error {

@@ -455,7 +455,18 @@ checksum = "80094f509cf8b5ae86a4966a39b3ff66cd7e2a3e594accec3743ff3fabeab5b2"
 dependencies = [
  "num-integer",
  "num-traits",
+ "serde",
  "time",
+]
+
+[[package]]
+name = "chrono-tz"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65d96be7c3e993c9ee4356442db24ba364c924b6b8331866be6b6952bfe74b9d"
+dependencies = [
+ "chrono",
+ "parse-zoneinfo",
 ]
 
 [[package]]
@@ -820,10 +831,11 @@ dependencies = [
  "actix-web",
  "awc",
  "bytes",
+ "chrono",
+ "chrono-tz",
  "env_logger",
  "ical",
  "ics",
- "log",
  "serde",
  "serde_json",
 ]
@@ -1111,6 +1123,15 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "winapi 0.3.8",
+]
+
+[[package]]
+name = "parse-zoneinfo"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c705f256449c60da65e11ff6626e0c16a0a0b96aaa348de61376b249bc340f41"
+dependencies = [
+ "regex",
 ]
 
 [[package]]
