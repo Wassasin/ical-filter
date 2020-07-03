@@ -51,7 +51,7 @@ impl std::convert::From<Event> for ics::Event<'_> {
 
 async fn compute_events<'a>(
     url: &str,
-    selector: &'a str,
+    selector: Option<&'a str>,
 ) -> Result<impl Iterator<Item = Result<impl Iterator<Item = Result<Event>> + 'a>>> {
     let calendars = upstream::get_calendars(url).await?;
 
@@ -102,7 +102,13 @@ async fn compute_events<'a>(
                 }
 
                 if let (Some(uid), Some(summary), Some(stamp)) = (uid, summary, stamp) {
-                    if selector == summary {
+                    let accept = if let Some(selector) = selector {
+                        selector == summary
+                    } else {
+                        true
+                    };
+
+                    if accept {
                         Ok(Some(Event {
                             uid,
                             summary,
@@ -122,8 +128,8 @@ async fn compute_events<'a>(
     }))
 }
 
-async fn collect_events(url: &str, selector: &str) -> Result<Vec<Event>> {
-    let iter = compute_events(url, selector).await?;
+async fn collect_events(url: &str, selector: &Option<String>) -> Result<Vec<Event>> {
+    let iter = compute_events(url, selector.as_ref().map(String::as_str)).await?;
 
     let mut res = Vec::new();
     for calendar in iter {
@@ -138,7 +144,7 @@ async fn collect_events(url: &str, selector: &str) -> Result<Vec<Event>> {
 #[derive(Deserialize)]
 struct FilterParams {
     url: String,
-    filter: String,
+    filter: Option<String>,
 }
 
 async fn get_json(query: Query<FilterParams>) -> Result<HttpResponse> {
