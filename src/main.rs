@@ -10,6 +10,7 @@ use actix_web::{
 use chrono::{DateTime, Utc};
 use chrono_tz::{Tz, UTC};
 use filter::Filter;
+use listenfd::ListenFd;
 use serde::{Deserialize, Serialize};
 
 pub mod env;
@@ -53,7 +54,7 @@ impl std::convert::From<Event> for ics::Event<'_> {
 
 async fn compute_events<'a>(
     url: &str,
-    filters: &'a Vec<Filter>,
+    filters: &'a [Filter],
 ) -> Result<impl Iterator<Item = Result<impl Iterator<Item = Result<Event>> + 'a>>> {
     let calendars = upstream::get_calendars(url).await?;
 
@@ -126,7 +127,7 @@ async fn compute_events<'a>(
     }))
 }
 
-async fn collect_events(url: &str, filters: &Vec<Filter>) -> Result<Vec<Event>> {
+async fn collect_events(url: &str, filters: &[Filter]) -> Result<Vec<Event>> {
     let iter = compute_events(url, filters).await?;
 
     let mut res = Vec::new();
@@ -186,8 +187,9 @@ async fn main() -> std::io::Result<()> {
 
     let configuration = env::get_conf().unwrap();
     let socketaddr = configuration.socketaddr;
+    let mut listenfd = ListenFd::from_env();
 
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         let configuration = configuration.clone();
 
         App::new()
@@ -195,8 +197,12 @@ async fn main() -> std::io::Result<()> {
             .data(configuration)
             .service(web::resource("/v1/json").to(get_json))
             .service(web::resource("/v1/ical").to(get_ical))
-    })
-    .bind(socketaddr)?
-    .run()
-    .await
+    });
+
+    let server = if let Some(listener) = listenfd.take_tcp_listener(0)? {
+        server.listen(listener)?
+    } else {
+        server.bind(socketaddr)?
+    };
+    server.run().await
 }

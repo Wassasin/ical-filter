@@ -2,12 +2,22 @@ use regex::Regex;
 use serde::de;
 use std::fmt;
 
-type MyError = Box<dyn std::error::Error>;
-
+// this lint is falsely triggering on this, which is *not* interior mutable
+#[allow(clippy::declare_interior_mutable_const)]
 pub const TRUE_FILTER: Filter = Filter {
     invert: false,
     operator: FilterOperator::True,
 };
+
+#[derive(Debug)]
+pub enum FilterErrorKind {
+    MissingColon,
+    OperatorParse,
+    RegexError(regex::Error),
+}
+
+#[derive(Debug)]
+pub struct FilterError(String, FilterErrorKind);
 
 #[derive(Debug)]
 enum FilterOperator {
@@ -27,15 +37,15 @@ pub struct Filter {
 
 impl FilterOperator {
     /// Parses a stringified filter operator into a [`FilterOperator`](enum.FilterOperator.html)
-    fn parse(s: &str, content: String) -> Result<FilterOperator, MyError> {
+    fn parse(s: &str, content: String) -> Result<FilterOperator, FilterError> {
         match s {
             "equals" => Ok(FilterOperator::Equals(content)),
             "startsWith" => Ok(FilterOperator::StartsWith(content)),
             "endsWith" => Ok(FilterOperator::EndsWith(content)),
             "contains" => Ok(FilterOperator::Contains(content)),
             "true" => Ok(FilterOperator::True),
-            "regex" => Ok(FilterOperator::Regex(Regex::new(&content)?)),
-            _ => Err("unknown filter operator; options are equals, startsWith, endsWith, contains, true, regex".into()),
+            "regex" => Ok(FilterOperator::Regex(Regex::new(&content).map_err(|e| FilterError(content, FilterErrorKind::RegexError(e)))?)),
+            _ => Err(FilterError("unknown filter operator; options are equals, startsWith, endsWith, contains, true, regex".to_owned(), FilterErrorKind::OperatorParse)),
         }
     }
 
@@ -55,11 +65,13 @@ impl FilterOperator {
 
 impl Filter {
     /// Parses a filter into a Filter struct.
-    fn parse(s: &str) -> Result<Filter, MyError> {
+    fn parse(s: &str) -> Result<Filter, FilterError> {
         let invert = s.starts_with('!');
         let s = if invert { &s[1..] } else { s };
 
-        let colon = s.find(":").ok_or_else(|| "missing colon in filter")?;
+        let colon = s
+            .find(':')
+            .ok_or_else(|| FilterError(s.to_owned(), FilterErrorKind::MissingColon))?;
         let (operator, text) = s.split_at(colon);
         // chop off colon
         let text = &text[1..];
@@ -98,8 +110,8 @@ where
             E: de::Error,
         {
             let mut filters = Vec::new();
-            for filt in v.split("~") {
-                let parsed = Filter::parse(filt).map_err(E::custom)?;
+            for filt in v.split('~') {
+                let parsed = Filter::parse(filt).map_err(|e| E::custom(format!("{:?}", e)))?;
                 filters.push(parsed);
             }
 
