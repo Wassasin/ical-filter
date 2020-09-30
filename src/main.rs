@@ -2,16 +2,13 @@
 
 use crate::env::EnvConfiguration;
 use crate::error::Result;
-use actix_web::{
-    middleware::Logger,
-    web::{self, Query},
-    App, HttpResponse, HttpServer,
-};
+use actix_web::{middleware::Logger, web, App, FromRequest, HttpResponse, HttpServer};
 use chrono::{DateTime, Utc};
 use chrono_tz::{Tz, UTC};
 use filter::Filter;
 use listenfd::ListenFd;
 use serde::{Deserialize, Serialize};
+use serde_qs::actix::QsQuery;
 
 pub mod env;
 pub mod error;
@@ -144,19 +141,16 @@ async fn collect_events(url: &str, filters: &[Filter]) -> Result<Vec<Event>> {
 struct FilterParams {
     url: String,
     #[serde(default)]
-    #[serde(deserialize_with = "filter::deserialize_filter_list")]
-    filter: Option<Vec<Filter>>,
+    filter: Vec<Filter>,
 }
 
-async fn get_json(query: Query<FilterParams>) -> Result<HttpResponse> {
+async fn get_json(query: QsQuery<FilterParams>) -> Result<HttpResponse> {
     let FilterParams { url, filter } = query.into_inner();
-    let filter = filter.unwrap_or_else(|| vec![filter::TRUE_FILTER]);
     Ok(HttpResponse::Ok().json(collect_events(&url, &filter).await?))
 }
 
-async fn get_ical(query: Query<FilterParams>) -> Result<HttpResponse> {
+async fn get_ical(query: QsQuery<FilterParams>) -> Result<HttpResponse> {
     let FilterParams { url, filter } = query.into_inner();
-    let filter = filter.unwrap_or_else(|| vec![filter::TRUE_FILTER]);
     let events = collect_events(&url, &filter).await?;
 
     use ics::{properties::*, *};
@@ -195,6 +189,9 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(Logger::default())
             .data(configuration)
+            .app_data(QsQuery::<FilterParams>::configure(|cfg| {
+                cfg.error_handler(|err, _req| error::Error::from(err).into())
+            }))
             .service(web::resource("/v1/json").to(get_json))
             .service(web::resource("/v1/ical").to(get_ical))
     });

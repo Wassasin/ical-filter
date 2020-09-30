@@ -90,36 +90,30 @@ impl Filter {
     }
 }
 
-pub fn deserialize_filter_list<'de, D>(ds: D) -> Result<Option<Vec<Filter>>, D::Error>
-where
-    D: de::Deserializer<'de>,
-{
-    // inspired by https://github.com/actix/actix-web/issues/1301#issuecomment-687041548
-    struct StringVecVisitor;
+impl<'de> de::Deserialize<'de> for Filter {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct FilterVisitor;
 
-    impl<'de> de::Visitor<'de> for StringVecVisitor {
-        type Value = Option<Vec<Filter>>;
+        impl<'de> de::Visitor<'de> for FilterVisitor {
+            type Value = Filter;
 
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            // tilde arbitrarily chosen as it is very unlikely to appear in a filter
-            formatter.write_str("a tilde separated list of [!]operator:filter")
-        }
-
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            let mut filters = Vec::new();
-            for filt in v.split('~') {
-                let parsed = Filter::parse(filt).map_err(|e| E::custom(format!("{:?}", e)))?;
-                filters.push(parsed);
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("[!]operator:filter")
             }
 
-            Ok(Some(filters))
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Filter::parse(v).map_err(|e| E::custom(format!("{:?}", e)))
+            }
         }
-    }
 
-    ds.deserialize_any(StringVecVisitor)
+        deserializer.deserialize_any(FilterVisitor)
+    }
 }
 
 #[cfg(test)]

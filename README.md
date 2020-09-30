@@ -20,7 +20,7 @@ cargo run
 All endpoints accept the following query parameters:
 
 * `url`: source url for an ical feed.
-* `filter` *(optional)*: tilde (~) delimited list of filters of the format
+* `filter[]` *(optional)*: a filter of the format
   `[!]condition:pattern` to be applied on the summary (title) field.
   Including a `!` at the start of the filter will invert it. All filters must
   match for an event to be included.
