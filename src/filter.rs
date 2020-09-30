@@ -2,13 +2,6 @@ use regex::Regex;
 use serde::de;
 use std::fmt;
 
-// this lint is falsely triggering on this, which is *not* interior mutable
-#[allow(clippy::declare_interior_mutable_const)]
-pub const TRUE_FILTER: Filter = Filter {
-    invert: false,
-    operator: FilterOperator::True,
-};
-
 #[derive(Debug)]
 pub enum FilterErrorKind {
     MissingColon,
@@ -25,7 +18,6 @@ enum FilterOperator {
     StartsWith(String),
     EndsWith(String),
     Contains(String),
-    True,
     Regex(Regex),
 }
 
@@ -43,7 +35,6 @@ impl FilterOperator {
             "startsWith" => Ok(FilterOperator::StartsWith(content)),
             "endsWith" => Ok(FilterOperator::EndsWith(content)),
             "contains" => Ok(FilterOperator::Contains(content)),
-            "true" => Ok(FilterOperator::True),
             "regex" => Ok(FilterOperator::Regex(Regex::new(&content).map_err(|e| FilterError(content, FilterErrorKind::RegexError(e)))?)),
             _ => Err(FilterError("unknown filter operator; options are equals, startsWith, endsWith, contains, true, regex".to_owned(), FilterErrorKind::OperatorParse)),
         }
@@ -57,7 +48,6 @@ impl FilterOperator {
             FilterOperator::StartsWith(pat) => s.starts_with(pat),
             FilterOperator::EndsWith(pat) => s.ends_with(pat),
             FilterOperator::Contains(pat) => s.contains(pat),
-            FilterOperator::True => true,
             FilterOperator::Regex(pat) => pat.is_match(s),
         }
     }
@@ -130,16 +120,10 @@ mod test {
             FilterOperator::StartsWith(a) if a == "aaa"
         ));
 
-        let qs = "true:aaa";
-        let parsed = Filter::parse(qs).unwrap();
-        assert_eq!(parsed.invert, false);
-        assert!(matches!(parsed.operator, FilterOperator::True));
-        assert!(parsed.matches("a"));
-
-        let qs = "!true:aaa";
+        let qs = "!contains:a";
         let parsed = Filter::parse(qs).unwrap();
         assert_eq!(parsed.invert, true);
-        assert!(matches!(parsed.operator, FilterOperator::True));
-        assert!(!parsed.matches("a"));
+        assert!(matches!(parsed.operator, FilterOperator::Contains(ref a) if a == "a"));
+        assert!(!parsed.matches("aaa"));
     }
 }

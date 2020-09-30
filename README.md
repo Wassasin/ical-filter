@@ -30,7 +30,6 @@ Supported conditions:
 * `startsWith` -- summary starts with `pattern`
 * `endsWith` -- summary ends with `pattern`
 * `contains` -- summary contains `pattern`
-* `true` -- always matches, `pattern` unused
 * `regex` -- summary matches the given regex
 
 Example filters:
