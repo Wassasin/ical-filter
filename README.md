@@ -20,7 +20,22 @@ cargo run
 All endpoints accept the following query parameters:
 
 * `url`: source url for an ical feed.
-* `filter` *(optional)*: whitelist filter for summary field of events. Can only set one (for now).
+* `filter[]` *(optional)*: a filter of the format
+  `[!]condition:pattern` to be applied on the summary (title) field.
+  Including a `!` at the start of the filter will invert it. All filters must
+  match for an event to be included.
+
+Supported conditions:
+* `equals` -- summary equals `pattern` (the behaviour of previous versions)
+* `startsWith` -- summary starts with `pattern`
+* `endsWith` -- summary ends with `pattern`
+* `contains` -- summary contains `pattern`
+* `regex` -- summary matches the given regex
+
+Example filters:
+* `true:` -- matches everything. equivalent to not including a filter
+* `!regex:this:can:have:colons.*` -- rejects events starting with `this:can:have:colons`
+* `contains:aaa~!true:` -- rejects all events due to the inverted `true` condition
 
 ### JSON
 Retrieve the `url` and render as JSON with `Content-Type: application/json`.

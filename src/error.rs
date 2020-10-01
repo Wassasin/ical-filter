@@ -7,6 +7,7 @@ pub enum Error {
     UpstreamFailure,
     AuthenticationFailure,
     Inconsistency,
+    BadRequest(String),
 }
 
 impl core::convert::From<SendRequestError> for Error {
@@ -33,6 +34,12 @@ impl core::convert::From<chrono::format::ParseError> for Error {
     }
 }
 
+impl core::convert::From<serde_qs::Error> for Error {
+    fn from(e: serde_qs::Error) -> Self {
+        Error::BadRequest(format!("{}", e))
+    }
+}
+
 pub type Result<T> = core::result::Result<T, Error>;
 
 impl core::fmt::Display for Error {
@@ -47,6 +54,7 @@ impl ResponseError for Error {
             Error::UpstreamFailure => HttpResponse::ServiceUnavailable(),
             Error::AuthenticationFailure => HttpResponse::InternalServerError(),
             Error::Inconsistency => HttpResponse::InternalServerError(),
+            Error::BadRequest(_) => HttpResponse::BadRequest(),
         };
 
         response.json(self)

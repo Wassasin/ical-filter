@@ -2,17 +2,17 @@
 
 use crate::env::EnvConfiguration;
 use crate::error::Result;
-use actix_web::{
-    middleware::Logger,
-    web::{self, Query},
-    App, HttpResponse, HttpServer,
-};
+use actix_web::{middleware::Logger, web, App, FromRequest, HttpResponse, HttpServer};
 use chrono::{DateTime, Utc};
 use chrono_tz::{Tz, UTC};
+use filter::Filter;
+use listenfd::ListenFd;
 use serde::{Deserialize, Serialize};
+use serde_qs::actix::QsQuery;
 
 pub mod env;
 pub mod error;
+pub mod filter;
 pub mod upstream;
 
 #[derive(Serialize)]
@@ -51,7 +51,7 @@ impl std::convert::From<Event> for ics::Event<'_> {
 
 async fn compute_events<'a>(
     url: &str,
-    selector: Option<&'a str>,
+    filters: &'a [Filter],
 ) -> Result<impl Iterator<Item = Result<impl Iterator<Item = Result<Event>> + 'a>>> {
     let calendars = upstream::get_calendars(url).await?;
 
@@ -102,11 +102,7 @@ async fn compute_events<'a>(
                 }
 
                 if let (Some(uid), Some(summary), Some(stamp)) = (uid, summary, stamp) {
-                    let accept = if let Some(selector) = selector {
-                        selector == summary
-                    } else {
-                        true
-                    };
+                    let accept = filters.iter().all(|filt| filt.matches(&summary));
 
                     if accept {
                         Ok(Some(Event {
@@ -128,8 +124,8 @@ async fn compute_events<'a>(
     }))
 }
 
-async fn collect_events(url: &str, selector: &Option<String>) -> Result<Vec<Event>> {
-    let iter = compute_events(url, selector.as_ref().map(String::as_str)).await?;
+async fn collect_events(url: &str, filters: &[Filter]) -> Result<Vec<Event>> {
+    let iter = compute_events(url, filters).await?;
 
     let mut res = Vec::new();
     for calendar in iter {
@@ -141,18 +137,21 @@ async fn collect_events(url: &str, selector: &Option<String>) -> Result<Vec<Even
     Ok(res)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct FilterParams {
     url: String,
-    filter: Option<String>,
+    #[serde(default)]
+    filter: Vec<Filter>,
 }
 
-async fn get_json(query: Query<FilterParams>) -> Result<HttpResponse> {
-    Ok(HttpResponse::Ok().json(collect_events(&query.url, &query.filter).await?))
+async fn get_json(query: QsQuery<FilterParams>) -> Result<HttpResponse> {
+    let FilterParams { url, filter } = query.into_inner();
+    Ok(HttpResponse::Ok().json(collect_events(&url, &filter).await?))
 }
 
-async fn get_ical(query: Query<FilterParams>) -> Result<HttpResponse> {
-    let events = collect_events(&query.url, &query.filter).await?;
+async fn get_ical(query: QsQuery<FilterParams>) -> Result<HttpResponse> {
+    let FilterParams { url, filter } = query.into_inner();
+    let events = collect_events(&url, &filter).await?;
 
     use ics::{properties::*, *};
 
@@ -182,17 +181,25 @@ async fn main() -> std::io::Result<()> {
 
     let configuration = env::get_conf().unwrap();
     let socketaddr = configuration.socketaddr;
+    let mut listenfd = ListenFd::from_env();
 
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         let configuration = configuration.clone();
 
         App::new()
             .wrap(Logger::default())
             .data(configuration)
+            .app_data(QsQuery::<FilterParams>::configure(|cfg| {
+                cfg.error_handler(|err, _req| error::Error::from(err).into())
+            }))
             .service(web::resource("/v1/json").to(get_json))
             .service(web::resource("/v1/ical").to(get_ical))
-    })
-    .bind(socketaddr)?
-    .run()
-    .await
+    });
+
+    let server = if let Some(listener) = listenfd.take_tcp_listener(0)? {
+        server.listen(listener)?
+    } else {
+        server.bind(socketaddr)?
+    };
+    server.run().await
 }
